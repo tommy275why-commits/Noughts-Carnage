@@ -121,9 +121,12 @@ function draw() {
 }
 
 function mousePressed() {
+  // Add this line to block all clicks until the network is connected
+  if (window.myRole === null) return; 
+
   if (gameState === "GAMEOVER") gameState = "GAME_OVER";
   if (isTransitioning) return; 
-
+  
   if (gameState === "GAME_OVER") {
       location.reload(); 
       return; 
