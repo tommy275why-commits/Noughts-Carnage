@@ -99,7 +99,16 @@ function draw() {
     drawGameOver();
   } 
   else if (gameState === "DRAFTING") {
-    if (typeof drawDraftScreen === "function") drawDraftScreen(); 
+    // Check if it's the opponent's turn to draft
+    if (draftQueue.length > 0 && window.myRole !== draftQueue[0] && window.myRole !== null) {
+        fill(255);
+        textSize(32);
+        textAlign(CENTER, CENTER);
+        text(`Waiting for Player ${draftQueue[0]} to choose powers...`, width / 2, height / 2);
+    } else {
+        // Draw normal draft screen for the active player
+        if (typeof drawDraftScreen === "function") drawDraftScreen(); 
+    }
   } 
   else if (gameState === "PLAYING" || gameState === "POWER_SWAP") {
     if (lastChanceActive && millis() > lastChanceEndTime && !isTransitioning) finalizeRound(pendingWinner);
@@ -113,7 +122,18 @@ function draw() {
     drawTooltips(); 
     
     if (gameState === "POWER_SWAP" && typeof drawSwapUI === "function") {
-        drawSwapUI();
+        // Check if the opponent is currently swapping powers to prevent UI leaks
+        if (swappingPlayer && window.myRole !== swappingPlayer && window.myRole !== null) {
+            fill(0, 0, 0, 200); // Semi-transparent black overlay hides the board
+            rectMode(CORNER);
+            rect(0, 0, width, height);
+            fill(255);
+            textSize(32);
+            textAlign(CENTER, CENTER);
+            text(`Waiting for Player ${swappingPlayer} to swap a power...`, width / 2, height / 2);
+        } else {
+            drawSwapUI();
+        }
     }
   }
   pop(); 
