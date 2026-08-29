@@ -51,10 +51,13 @@ const C_GLOW = [255, 255, 100, 180];
 const C_BG = [20, 25, 30]; 
 function setup() {
   let canvas = createCanvas(800, 600);
-  canvas.parent('game-screen');
+  canvas.parent('game-screen'); // Locks the canvas inside the hidden HTML div
+  
   initBoard();
   currentPlayer = startingPlayer;
   textAlign(CENTER, CENTER);
+  
+  noLoop(); // FREEZES the game engine entirely until PeerJS connects
 }
 
 function windowResized() {
