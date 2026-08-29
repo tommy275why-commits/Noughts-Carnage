@@ -52,9 +52,10 @@ const C_DUST_DARK = [100, 90, 80, 50];
 const C_GLOW = [255, 255, 100, 180]; 
 const C_BG = [20, 25, 30]; 
 window.isGameReady = false; 
+
 function setup() {
   let canvas = createCanvas(800, 600);
-  canvas.parent('game-screen'); // Locks the canvas inside the hidden HTML div
+  canvas.parent('game-screen'); 
   
   initBoard();
   currentPlayer = startingPlayer;
@@ -121,7 +122,7 @@ function draw() {
 }
 
 function mousePressed() {
-  // STRICT NETWORK GATE: Block clicks entirely until the safety delay finishes
+  // STRICT NETWORK GATE
   if (!window.isGameReady || window.myRole === null) return; 
 
   if (gameState === "GAMEOVER") gameState = "GAME_OVER";
@@ -131,22 +132,17 @@ function mousePressed() {
       location.reload(); 
       return; 
   } 
- else if (gameState === "DRAFTING") {
-      // ADD THIS LINE: Only the player whose turn it is to draft can click
+  else if (gameState === "DRAFTING") {
       if (draftQueue.length > 0 && window.myRole !== draftQueue[0]) return;
-      
       if (typeof handleDraftClick === "function") handleDraftClick();
       return;
   } 
   else if (gameState === "POWER_SWAP") {
-      // ADD THIS LINE: Only the player swapping can click
       if (swappingPlayer && window.myRole !== swappingPlayer) return;
-
       if (typeof handleSwapClick === "function") handleSwapClick();
       return; 
   }
   else if (gameState === "PLAYING") {
-      // STRICT NETWORK GATE: Drop clicks if it's not this computer's turn
       if (currentPlayer !== window.myRole && window.myRole !== null) return;
 
       if (lastChanceActive && mouseY < 80) { finalizeRound(pendingWinner); return; }
@@ -210,7 +206,7 @@ function mousePressed() {
           }
         } else if (board[i][j] === '' || board[i][j].startsWith('MINE_') || board[i][j] === 'P_WALL') {
           let piece = board[i][j];
-          if (piece.startsWith('MINE_') && piece.endsWith(currentPlayer)) return; // Prevent clicking own mine
+          if (piece.startsWith('MINE_') && piece.endsWith(currentPlayer)) return; 
           
           window.applyMove(i, j, null, currentPlayer);
           if (typeof sendNetworkMove === "function") sendNetworkMove(i, j, null);
