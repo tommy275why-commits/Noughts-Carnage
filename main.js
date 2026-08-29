@@ -49,9 +49,9 @@ const C_DUST_LIGHT = [180, 170, 160, 80];
 const C_DUST_DARK = [100, 90, 80, 50];   
 const C_GLOW = [255, 255, 100, 180]; 
 const C_BG = [20, 25, 30]; 
-
 function setup() {
-  createCanvas(windowWidth, windowHeight); 
+  let canvas = createCanvas(800, 600);
+  canvas.parent('game-screen');
   initBoard();
   currentPlayer = startingPlayer;
   textAlign(CENTER, CENTER);
