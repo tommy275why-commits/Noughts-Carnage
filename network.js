@@ -49,6 +49,11 @@ function setupConnectionLogic() {
     document.getElementById('lobby-ui').style.display = 'none';
     loop(); 
 
+    // The safety buffer: waits half a second before letting clicks hit the board
+    setTimeout(() => {
+        window.isGameReady = true;
+    }, 500);
+
     conn.on('data', function(data) {
         if (data.type === 'MOVE') {
             window.applyMove(data.i, data.j, data.powerId, data.sourcePlayer);
