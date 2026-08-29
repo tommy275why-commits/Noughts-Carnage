@@ -131,14 +131,20 @@ function mousePressed() {
       location.reload(); 
       return; 
   } 
-  else if (gameState === "DRAFTING") {
+ else if (gameState === "DRAFTING") {
+      // ADD THIS LINE: Only the player whose turn it is to draft can click
+      if (draftQueue.length > 0 && window.myRole !== draftQueue[0]) return;
+      
       if (typeof handleDraftClick === "function") handleDraftClick();
       return;
   } 
   else if (gameState === "POWER_SWAP") {
+      // ADD THIS LINE: Only the player swapping can click
+      if (swappingPlayer && window.myRole !== swappingPlayer) return;
+
       if (typeof handleSwapClick === "function") handleSwapClick();
       return; 
-  } 
+  }
   else if (gameState === "PLAYING") {
       // STRICT NETWORK GATE: Drop clicks if it's not this computer's turn
       if (currentPlayer !== window.myRole && window.myRole !== null) return;
