@@ -51,7 +51,7 @@ const C_DUST_LIGHT = [180, 170, 160, 80];
 const C_DUST_DARK = [100, 90, 80, 50];   
 const C_GLOW = [255, 255, 100, 180]; 
 const C_BG = [20, 25, 30]; 
-
+window.isGameReady = false; 
 function setup() {
   let canvas = createCanvas(800, 600);
   canvas.parent('game-screen'); // Locks the canvas inside the hidden HTML div
@@ -121,11 +121,11 @@ function draw() {
 }
 
 function mousePressed() {
-  // Add this line to block all clicks until the network is connected
-  if (window.myRole === null) return; 
+  // STRICT NETWORK GATE: Block clicks entirely until the safety delay finishes
+  if (!window.isGameReady || window.myRole === null) return; 
 
   if (gameState === "GAMEOVER") gameState = "GAME_OVER";
-  if (isTransitioning) return; 
+  if (isTransitioning) return;
   
   if (gameState === "GAME_OVER") {
       location.reload(); 
