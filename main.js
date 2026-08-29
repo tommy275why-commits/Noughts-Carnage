@@ -1,3 +1,5 @@
+window.myRole = null; // Assigned by network.js ('X' for Host, 'O' for Guest)
+
 let gridSize = 3;
 let lastChanceActive = false;
 let pendingWinner = null;
@@ -49,6 +51,7 @@ const C_DUST_LIGHT = [180, 170, 160, 80];
 const C_DUST_DARK = [100, 90, 80, 50];   
 const C_GLOW = [255, 255, 100, 180]; 
 const C_BG = [20, 25, 30]; 
+
 function setup() {
   let canvas = createCanvas(800, 600);
   canvas.parent('game-screen'); // Locks the canvas inside the hidden HTML div
@@ -80,10 +83,8 @@ window.getBoardBounds = function() {
 }
 
 function draw() {
-  // Safety normalization to link with the UI.js cinematic
   if (gameState === "GAMEOVER") gameState = "GAME_OVER";
   
-  // ---> NEW: DYNAMIC ARENA BACKGROUND <---
   if (typeof drawDynamicBackground === "function") {
       drawDynamicBackground();
   } else {
@@ -93,7 +94,6 @@ function draw() {
   push(); 
   if (typeof runAnimations === "function") runAnimations(); 
 
-  // ---> STRICT HIERARCHY: ONLY ONE STATE CAN RENDER AT A TIME <---
   if (gameState === "GAME_OVER") {
     drawGameOver();
   } 
@@ -111,27 +111,22 @@ function draw() {
     if (lastChanceActive) drawLastChanceOverlay();
     drawTooltips(); 
     
-    // Draw SWAP UI directly on top of the playing board
     if (gameState === "POWER_SWAP" && typeof drawSwapUI === "function") {
         drawSwapUI();
     }
   }
   pop(); 
 
-  // ---> DRAW THE DEV CONSOLE ON TOP OF EVERYTHING <---
   if (typeof drawDevConsole === "function") drawDevConsole();
 }
 
 function mousePressed() {
-  // Safety normalization
   if (gameState === "GAMEOVER") gameState = "GAME_OVER";
-  
   if (isTransitioning) return; 
 
-  // ---> STRICT CLICK HIERARCHY <---
   if (gameState === "GAME_OVER") {
       location.reload(); 
-      return; // Stops clicks from hitting the board or drafting!
+      return; 
   } 
   else if (gameState === "DRAFTING") {
       if (typeof handleDraftClick === "function") handleDraftClick();
@@ -142,7 +137,9 @@ function mousePressed() {
       return; 
   } 
   else if (gameState === "PLAYING") {
-      // Normal game clicks
+      // STRICT NETWORK GATE: Drop clicks if it's not this computer's turn
+      if (currentPlayer !== window.myRole && window.myRole !== null) return;
+
       if (lastChanceActive && mouseY < 80) { finalizeRound(pendingWinner); return; }
       
       if (lastChanceActive) {
@@ -157,13 +154,10 @@ function mousePressed() {
         if (currentPlayer === silencedPlayer) return; 
         
         if (instantPowers.includes(clickedPower.id)) {
-          let success = typeof executePower === "function" ? executePower(clickedPower.id, 0, 0) : false;
-          if (success === "FREE_ACTION") { clickedPower.cd = clickedPower.maxCd; activePower = null; powerSource = null; return; } 
-          else if (success) {
-            clickedPower.cd = clickedPower.maxCd; activePower = null; powerSource = null;
-            let chanceTriggered = checkRoundOver(false); 
-            if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
-          }
+          window.applyMove(0, 0, clickedPower.id, currentPlayer);
+          if (typeof sendNetworkMove === "function") sendNetworkMove(0, 0, clickedPower.id);
+          
+          clickedPower.cd = clickedPower.maxCd; activePower = null; powerSource = null;
           return;
         }
 
@@ -193,61 +187,70 @@ function mousePressed() {
               if (activePower.id === 'SWAP' && (piece === opp || piece === opp + '_S') && !piece.endsWith('_A')) validTarget = true;
 
               if (validTarget) {
-                let success = executePower(activePower.id, i, j);
-                if (success === "FREE_ACTION") { activePower.cd = activePower.maxCd; activePower = null; powerSource = null; return; } 
-                else if (success) {
-                  activePower.cd = activePower.maxCd; activePower = null; powerSource = null;
-                  let chanceTriggered = checkRoundOver(false); 
-                  if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
-                }
+                window.applyMove(i, j, activePower.id, currentPlayer);
+                if (typeof sendNetworkMove === "function") sendNetworkMove(i, j, activePower.id);
+                
+                activePower.cd = activePower.maxCd; activePower = null; powerSource = null;
               } else { powerSource = null; } 
             }
           } else {
-            let success = executePower(activePower.id, i, j);
-            if (success === "FREE_ACTION") { activePower.cd = activePower.maxCd; activePower = null; powerSource = null; return; } 
-            else if (success) {
-              activePower.cd = activePower.maxCd; activePower = null; powerSource = null;
-              let chanceTriggered = checkRoundOver(false); 
-              if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
-            }
+            window.applyMove(i, j, activePower.id, currentPlayer);
+            if (typeof sendNetworkMove === "function") sendNetworkMove(i, j, activePower.id);
+            
+            activePower.cd = activePower.maxCd; activePower = null; powerSource = null;
           }
-        } else if (board[i][j] === '' || board[i][j].startsWith('MINE_')) {
+        } else if (board[i][j] === '' || board[i][j].startsWith('MINE_') || board[i][j] === 'P_WALL') {
           let piece = board[i][j];
+          if (piece.startsWith('MINE_') && piece.endsWith(currentPlayer)) return; // Prevent clicking own mine
           
-          if (piece.startsWith('MINE_')) {
-             if (piece.endsWith(currentPlayer)) return; 
-             else {
-                board[i][j] = piece.split('_')[1]; 
-                if (typeof triggerScreenShake === "function") triggerScreenShake(20);
-                if (typeof triggerPowerAnimation === "function") triggerPowerAnimation('MINE_TRIGGER', i, j);
-                let chanceTriggered = checkRoundOver(false); 
-                if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
-             }
-          } else {
-             if (lastChanceActive) { if (typeof triggerScreenShake === "function") triggerScreenShake(1); return; }
-             board[i][j] = currentPlayer;
-             
-             // ---> THE JUICE: TRIGGER THE SLAM ON NORMAL PLACEMENT <---
-             if (typeof triggerPieceSlam === "function") triggerPieceSlam(i, j);
-             
-             let chanceTriggered = checkRoundOver(false); 
-             if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
-          }
-        } else if (board[i][j] === 'P_WALL') {
-          board[i][j] = ''; 
-          if (typeof triggerScreenShake === "function") triggerScreenShake(5);
-          let chanceTriggered = checkRoundOver(false); 
-          if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
+          window.applyMove(i, j, null, currentPlayer);
+          if (typeof sendNetworkMove === "function") sendNetworkMove(i, j, null);
         }
       }
   }
 }
 
-// ---> CORE POWER SWAPPING LOGIC <---
+// ---> DECOUPLED NETWORK ACTION LOGIC <---
+window.applyMove = function(i, j, powerId = null, sourcePlayer = null) {
+  let playerToUse = sourcePlayer || currentPlayer;
+  
+  if (powerId) {
+    let success = typeof executePower === "function" ? executePower(powerId, i, j) : false;
+    if (success === "FREE_ACTION") return;
+    if (success) {
+      let chanceTriggered = checkRoundOver(false);
+      if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
+    }
+    return;
+  }
+
+  // Normal Placement Logic
+  let piece = board[i][j];
+  if (piece === '' || piece.startsWith('MINE_')) {
+    if (piece.startsWith('MINE_')) {
+      if (piece.endsWith(playerToUse)) return; 
+      board[i][j] = piece.split('_')[1]; 
+      if (typeof triggerScreenShake === "function") triggerScreenShake(20);
+      if (typeof triggerPowerAnimation === "function") triggerPowerAnimation('MINE_TRIGGER', i, j);
+    } else {
+      if (lastChanceActive) { if (typeof triggerScreenShake === "function") triggerScreenShake(1); return; }
+      board[i][j] = playerToUse;
+      if (typeof triggerPieceSlam === "function") triggerPieceSlam(i, j);
+    }
+    
+    let chanceTriggered = checkRoundOver(false); 
+    if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
+  } else if (piece === 'P_WALL') {
+    board[i][j] = ''; 
+    if (typeof triggerScreenShake === "function") triggerScreenShake(5);
+    let chanceTriggered = checkRoundOver(false); 
+    if (!chanceTriggered && gameState === "PLAYING" && !isTransitioning) changeTurn();
+  }
+};
 
 window.startDeletionProcess = function(chosenPowerDef, pTracker) {
     pendingNewPower = chosenPowerDef;
-    swappingPlayer = pTracker; // Tracks exactly who is swapping, fixing the Tie-Game merge bug!
+    swappingPlayer = pTracker; 
     isTrashMode = true;
     gameState = "POWER_SWAP";
 };
@@ -258,11 +261,9 @@ window.executeSwap = function(index) {
     let oldPower = playerPowers[swappingPlayer][index];
     let currentCD = oldPower.cd; 
 
-    // Inherit the Cooldown
     pendingNewPower.cd = currentCD; 
     playerPowers[swappingPlayer][index] = pendingNewPower;
 
-    // Visual feedback
     if (typeof triggerScreenShake === "function") triggerScreenShake(15);
     if (typeof triggerFlash === "function") triggerFlash(255, 50, 50, 150); 
     
@@ -275,12 +276,10 @@ window.closeSwapUI = function() {
     swappingPlayer = null;
     gameState = "PLAYING";
     
-    // We resume the game and change turn since drafting is technically over
     if (typeof isDraftingSetup !== "undefined") isDraftingSetup = false;
     changeTurn(); 
 };
 
-// Helper to find WHICH power was clicked (ignoring cooldown rules)
 window.getClickedPowerIndex = function() {
   let activeP = (gameState === "POWER_SWAP" && swappingPlayer) ? swappingPlayer : currentPlayer;
   let startX = (activeP === 'X') ? 20 : width - 200; 
@@ -293,8 +292,6 @@ window.getClickedPowerIndex = function() {
   }
   return -1;
 };
-
-// -------------------------------------------
 
 function changeTurn() {
   if (shortcutActive) { winCondition++; shortcutActive = false; }
@@ -322,7 +319,6 @@ function changeTurn() {
 
       if (cell === 'W_WALL_1_' + currentPlayer) { board[c][r] = 'W'; } 
       else if (cell === 'W_WALL_2_' + currentPlayer) { board[c][r] = 'W_WALL_1_' + currentPlayer; }
-      // ---> THE 2-TURN CRATER LOGIC <---
       else if (cell.startsWith('CRATER_')) {
         let turns = parseInt(cell.split('_')[1]);
         if (turns === 1) board[c][r] = '';
@@ -461,7 +457,7 @@ function finalizeRound(result) {
 
   if (result === 'VIRUS') {
       scores['X'] = 0; scores['O'] = 0; 
-      gameState = "GAME_OVER"; // Safely end the game without triggering draft queue
+      gameState = "GAME_OVER";
       draftQueue = []; 
       if (typeof isDraftingSetup !== "undefined") isDraftingSetup = false;
       if (typeof triggerScreenShake === "function") triggerScreenShake(30);
@@ -473,7 +469,7 @@ function finalizeRound(result) {
   if (typeof triggerScreenShake === "function") triggerScreenShake(8);
   setTimeout(() => {
     if (scores['X'] >= 5 || scores['O'] >= 5) { 
-        gameState = "GAME_OVER"; // Clear the draft queue so it doesn't overlap on a win
+        gameState = "GAME_OVER";
         draftQueue = []; 
         if (typeof isDraftingSetup !== "undefined") isDraftingSetup = false;
     } 
@@ -486,7 +482,6 @@ function finalizeRound(result) {
   }, 1000);
 }
 
-// ---> MASSIVE UPGRADE TO SUPPORT 4-IN-A-ROW DIAGONALS! <---
 function checkWinner() {
   if (eclipseTurnsLeft > 0) return null; 
 
@@ -502,7 +497,6 @@ function checkWinner() {
     return false;
   };
   
-  // Columns
   for (let j = 0; j < gridSize; j++) {
     let sX = 0, sO = 0, sV = 0;
     for (let i = 0; i < gridSize; i++) {
@@ -513,7 +507,6 @@ function checkWinner() {
     }
   }
 
-  // Rows
   for (let i = 0; i < gridSize; i++) {
     let sX = 0, sO = 0, sV = 0;
     for (let j = 0; j < gridSize; j++) {
@@ -524,7 +517,6 @@ function checkWinner() {
     }
   }
 
-  // Diagonals (Top-Left to Bottom-Right)
   for (let d = -(gridSize-1); d < gridSize; d++) {
     let sX = 0, sO = 0, sV = 0;
     for (let i = 0; i < gridSize; i++) {
@@ -538,7 +530,6 @@ function checkWinner() {
     }
   }
 
-  // Diagonals (Top-Right to Bottom-Left)
   for (let d = 0; d <= (gridSize-1)*2; d++) {
     let sX = 0, sO = 0, sV = 0;
     for (let i = 0; i < gridSize; i++) {
@@ -600,20 +591,17 @@ function applyGravity() {
 }
 
 function keyPressed() {
-  // Toggle the Dev Console with the Tilde (~) or Backtick (`) key
   if (key === '`' || key === '~') {
     devConsoleActive = !devConsoleActive;
-    if (devConsoleActive) devInputText = ""; // Clear input when opening
-    return false; // Prevent browser default actions
+    if (devConsoleActive) devInputText = ""; 
+    return false; 
   }
 
-  // If console is open, send all typing to the Dev Console instead of the game
   if (typeof devConsoleActive !== 'undefined' && devConsoleActive) {
     if (typeof handleDevInput === "function") handleDevInput(key, keyCode);
-    return false; // Stop game from processing other keys
+    return false; 
   }
 
-  // Regular game hotkeys
   if (key === 'a' || key === 'A') {
     if (typeof triggerApocalypse === "function" && !activeEvent) triggerApocalypse();
   }
