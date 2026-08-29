@@ -1,4 +1,22 @@
 // ==========================================
+// --- DETERMINISTIC PRNG ENGINE ---
+// ==========================================
+let currentSeed = 12345;
+
+window.setSeed = function(newSeed) {
+  currentSeed = newSeed;
+};
+
+function seededRandom(min, max) {
+  currentSeed = (currentSeed * 9301 + 49297) % 233280;
+  let rnd = currentSeed / 233280;
+  
+  if (min === undefined) return rnd;
+  if (max === undefined) return rnd * min;
+  return min + rnd * (max - min);
+}
+
+// ==========================================
 // --- THE MAYHEM VISUAL EFFECTS ENGINE ---
 // ==========================================
 
@@ -12,7 +30,7 @@ let activeFX = [];
 // --- THE MAIN ANIMATION LOOP ---
 window.runAnimations = function() {
   if (shakeAmount > 0) {
-    translate(random(-shakeAmount, shakeAmount), random(-shakeAmount, shakeAmount));
+    translate(seededRandom(-shakeAmount, shakeAmount), seededRandom(-shakeAmount, shakeAmount));
     shakeAmount *= 0.9;
     if (shakeAmount < 0.5) shakeAmount = 0;
   }
@@ -32,9 +50,8 @@ window.runAnimations = function() {
       let bnd = typeof getBoardBounds === 'function' ? getBoardBounds() : {x: 200, top: 80, w: 600, h: 520};
       push();
       
-      // 1. The looping red bloodline
       let perimeter = (bnd.w * 2) + (bnd.h * 2);
-      let dist = (fx.t * 15) % perimeter; // Crawl speed
+      let dist = (fx.t * 15) % perimeter; 
       let lx = bnd.x, ly = bnd.top;
       
       if (dist < bnd.w) { lx += dist; } 
@@ -46,17 +63,15 @@ window.runAnimations = function() {
       fill(255, 0, 0); noStroke();
       circle(lx, ly, 15);
       
-      // 2. The Board outline glow
       noFill(); stroke(200, 0, 0, map(fx.t, 0, fx.maxT, 100, 0)); strokeWeight(4);
       rectMode(CORNER); rect(bnd.x, bnd.top, bnd.w, bnd.h);
 
-      // 3. Glitching Text Overlays
       if (frameCount % 6 < 3) {
-        fill(255, 0, 0, random(100, 255));
+        fill(255, 0, 0, seededRandom(100, 255));
         textAlign(CENTER, CENTER);
-        textSize(random(50, 80));
+        textSize(seededRandom(50, 80));
         let words = ["C U R S E D", "E R R O R", "S W A P", "V O I D"];
-        text(words[frameCount % words.length], width/2 + random(-10, 10), height/2 + random(-10, 10));
+        text(words[frameCount % words.length], width/2 + seededRandom(-10, 10), height/2 + seededRandom(-10, 10));
       }
       pop();
     }
@@ -66,20 +81,18 @@ window.runAnimations = function() {
     else if (fx.id === 'BLOOD_MAGIC') {
       push(); translate(width/2, height/2);
       
-      // Crimson shockwave ripples
       noFill(); stroke(180, 0, 0, map(fx.t, 0, fx.maxT, 255, 0));
       strokeWeight(map(fx.t, 0, fx.maxT, 30, 2));
       circle(0, 0, fx.t * 25);
       circle(0, 0, fx.t * 15);
       
-      // Jagged dark tendrils striking outward
       stroke(80, 0, 20, map(fx.t, 0, fx.maxT, 255, 0));
       strokeWeight(6);
       for(let i = 0; i < 8; i++) {
           push(); rotate((TWO_PI / 8) * i + (fx.t * 0.02));
           beginShape();
           for(let j = 0; j < 6; j++) {
-              vertex(j * fx.t * 3, random(-30, 30));
+              vertex(j * fx.t * 3, seededRandom(-30, 30));
           }
           endShape();
           pop();
@@ -91,10 +104,9 @@ window.runAnimations = function() {
     // ==========================================
     else if (fx.id === 'TIME_BOMB') {
       push(); translate(fx.x, fx.y);
-      let tickPhase = 45; // Frames spent ticking down
+      let tickPhase = 45; 
       
       if (fx.t < tickPhase) {
-          // PHASE 1: Ticking Rings Snapping Inward
           let radius = map(fx.t, 0, tickPhase, 300, 0);
           drawingContext.shadowBlur = 15; drawingContext.shadowColor = "cyan";
           noFill(); stroke(0, 255, 255, 200); strokeWeight(4);
@@ -105,23 +117,21 @@ window.runAnimations = function() {
               if (typeof triggerScreenShake === "function") triggerScreenShake(5);
           }
       } else {
-          // PHASE 2: Chronological Detonation
           let boomT = fx.t - tickPhase;
           let maxBoom = fx.maxT - tickPhase;
           let blastW = map(boomT, 0, maxBoom, 0, width * 1.2);
           
           drawingContext.shadowBlur = 40; drawingContext.shadowColor = "orange";
           noStroke(); 
-          fill(0, 255, 255, map(boomT, 0, maxBoom, 255, 0)); // Cyan outer
+          fill(0, 255, 255, map(boomT, 0, maxBoom, 255, 0)); 
           circle(0, 0, blastW);
-          fill(255, 100, 0, map(boomT, 0, maxBoom, 255, 0)); // Orange inner
+          fill(255, 100, 0, map(boomT, 0, maxBoom, 255, 0)); 
           circle(0, 0, blastW * 0.7);
-          fill(255, 255, 255, map(boomT, 0, maxBoom, 255, 0)); // White core
+          fill(255, 255, 255, map(boomT, 0, maxBoom, 255, 0)); 
           circle(0, 0, blastW * 0.3);
       }
       pop();
     }
-    // ==========================================
     else if (fx.id === 'VORTEX') {
       push(); translate(fx.x, fx.y); rotate(frameCount * 0.2);
       
@@ -174,7 +184,7 @@ window.runAnimations = function() {
       ellipse(bx, (ringY + height/2) % height, laserW * 1.5, 30);
 
       if (fx.t < fx.maxT - 5) {
-        for(let s = 0; s < 5; s++) activeFX.push({ id: 'LASER_SPARK', x: bx + random(-w, w), y: random(height), vy: random(-15, -40), t: 0, maxT: random(10, 20) });
+        for(let s = 0; s < 5; s++) activeFX.push({ id: 'LASER_SPARK', x: bx + seededRandom(-w, w), y: seededRandom(height), vy: seededRandom(-15, -40), t: 0, maxT: seededRandom(10, 20) });
       }
       pop();
     }
@@ -209,7 +219,7 @@ window.runAnimations = function() {
       drawingContext.shadowBlur = 20; drawingContext.shadowColor = "magenta";
       for(let r = 1; r <= 8; r++) { 
         strokeWeight(map(fx.t, 0, fx.maxT, 8, 1));
-        stroke(random(150, 255), 50, 255, map(fx.t, 0, fx.maxT, 255, 0)); 
+        stroke(seededRandom(150, 255), 50, 255, map(fx.t, 0, fx.maxT, 255, 0)); 
         rotate(fx.t * 0.05); 
         ellipse(0, 0, (fx.t * r * 15) + (fx.t*5), (fx.t * r * 5) + (fx.t*2)); 
       } 
@@ -223,7 +233,7 @@ window.runAnimations = function() {
       let cellW = (bnd.w / gridSize) * 0.8;
       
       if (fx.t < fx.waitT) {
-          fill(255, 50, 255, random(200, 255));
+          fill(255, 50, 255, seededRandom(200, 255));
           rect(0, 0, cellW, cellW, 15);
       } else {
           let progress = (fx.t - fx.waitT) / (fx.maxT - fx.waitT);
@@ -246,7 +256,7 @@ window.runAnimations = function() {
     else if (fx.id === 'GRAVITY_WELL') {
       push(); fill(100, 50, 200, map(fx.t, 0, fx.maxT, 150, 0)); rect(0, 0, width, height);
       stroke(255, map(fx.t, 0, fx.maxT, 200, 0)); strokeWeight(2);
-      for(let k = 0; k < 20; k++) { line(random(width), random(height), random(width), random(height) + 100); } pop();
+      for(let k = 0; k < 20; k++) { line(seededRandom(width), seededRandom(height), seededRandom(width), seededRandom(height) + 100); } pop();
     }
     else if (fx.id === 'LABYRINTH') {
       push(); rectMode(CENTER); noFill(); translate(width / 2, height / 2); 
@@ -303,8 +313,8 @@ window.runAnimations = function() {
             
             let pos = getCellCenter(fx.i, fx.j);
             for (let k = 0; k < 12; k++) {
-                let angle = random(TWO_PI); let speed = random(3, 8);
-                activeFX.push({ id: 'DUST', x: pos.x, y: pos.y, vx: cos(angle) * speed, vy: sin(angle) * speed, t: 0, maxT: random(15, 30) });
+                let angle = seededRandom(TWO_PI); let speed = seededRandom(3, 8);
+                activeFX.push({ id: 'DUST', x: pos.x, y: pos.y, vx: cos(angle) * speed, vy: sin(angle) * speed, t: 0, maxT: seededRandom(15, 30) });
             }
         }
     }
@@ -376,31 +386,31 @@ window.triggerPowerAnimation = function(id, i, j) {
   else if (id === 'VORTEX') {
     activeFX.push({ id: 'VORTEX', x: pos.x, y: pos.y, t: 0, maxT: 50 }); triggerScreenShake(20);
     for (let k = 0; k < 60; k++) {
-      let angle = random(TWO_PI); let dist = random(100, 300);
-      particles.push({ x: pos.x + cos(angle) * dist, y: pos.y + sin(angle) * dist, vx: 0, vy: 0, targetX: pos.x, targetY: pos.y, life: 1.0, decay: random(0.01, 0.03), color: random() > 0.5 ? [220, 40, 40] : [60, 100, 255], size: random(8, 15), shape: 'rect', behavior: 'suck' });
+      let angle = seededRandom(TWO_PI); let dist = seededRandom(100, 300);
+      particles.push({ x: pos.x + cos(angle) * dist, y: pos.y + sin(angle) * dist, vx: 0, vy: 0, targetX: pos.x, targetY: pos.y, life: 1.0, decay: seededRandom(0.01, 0.03), color: seededRandom() > 0.5 ? [220, 40, 40] : [60, 100, 255], size: seededRandom(8, 15), shape: 'rect', behavior: 'suck' });
     }
   } 
   else if (id === 'NUKE') {
     triggerFlash(255, 255, 255, 255); triggerScreenShake(40);
     activeFX.push({ id: 'NUKE_SHOCKWAVE', x: width / 2, y: height / 2, t: 0, maxT: 50 });
     for (let k = 0; k < 120; k++) { 
-       let angle = random(TWO_PI); let speed = random(10, 30);
-       particles.push({ x: width/2, y: height/2, vx: cos(angle)*speed, vy: sin(angle)*speed, life: 1.0, decay: random(0.01, 0.04), color: random() > 0.5 ? [255, 100, 0] : [255, 200, 50], size: random(20, 60), shape: 'circle', behavior: 'normal' }); 
+       let angle = seededRandom(TWO_PI); let speed = seededRandom(10, 30);
+       particles.push({ x: width/2, y: height/2, vx: cos(angle)*speed, vy: sin(angle)*speed, life: 1.0, decay: seededRandom(0.01, 0.04), color: seededRandom() > 0.5 ? [255, 100, 0] : [255, 200, 50], size: seededRandom(20, 60), shape: 'circle', behavior: 'normal' }); 
     }
     for (let k = 0; k < 50; k++) {
-       particles.push({ x: random(width), y: random(height/2), vx: random(-2, 2), vy: random(2, 6), life: 1.0, decay: random(0.005, 0.02), color: [100, 255, 100], size: random(4, 10), shape: 'rect', behavior: 'fall' });
+       particles.push({ x: seededRandom(width), y: seededRandom(height/2), vx: seededRandom(-2, 2), vy: seededRandom(2, 6), life: 1.0, decay: seededRandom(0.005, 0.02), color: [100, 255, 100], size: seededRandom(4, 10), shape: 'rect', behavior: 'fall' });
     }
   }
   else if (id === 'BOMB') { activeFX.push({ id: 'BOMB', x: pos.x, y: pos.y, t: 0, maxT: 30 }); triggerScreenShake(20); triggerFlash(255, 200, 150, 150); }
   else if (id === 'LASER') { activeFX.push({ id: 'LASER', col: i, t: 0, maxT: 45 }); triggerScreenShake(30); triggerFlash(255, 100, 100, 200); }
   else if (id === 'GRAVITY' || id === 'GRAVITY_WELL') { activeFX.push({ id: 'GRAVITY_WELL', t: 0, maxT: 40 }); triggerScreenShake(15); }
-  else if (id === 'SINKHOLE') { triggerScreenShake(20); for (let k = 0; k < 40; k++) { particles.push({ x: random(200, 800), y: height - 100, vx: random(-5, 5), vy: random(-10, 0), life: 1.0, decay: random(0.02, 0.05), color: [80, 80, 90], size: random(10, 25), shape: 'rect', behavior: 'fall' }); } }
-  else if (id === 'ERASER') { triggerScreenShake(5); for (let k = 0; k < 20; k++) { particles.push({ x: pos.x, y: pos.y, vx: random(-8, 8), vy: random(-8, 8), life: 1.0, decay: random(0.03, 0.08), color: [0, 255, 100], size: random(5, 12), shape: 'rect', behavior: 'normal' }); } }
+  else if (id === 'SINKHOLE') { triggerScreenShake(20); for (let k = 0; k < 40; k++) { particles.push({ x: seededRandom(200, 800), y: height - 100, vx: seededRandom(-5, 5), vy: seededRandom(-10, 0), life: 1.0, decay: seededRandom(0.02, 0.05), color: [80, 80, 90], size: seededRandom(10, 25), shape: 'rect', behavior: 'fall' }); } }
+  else if (id === 'ERASER') { triggerScreenShake(5); for (let k = 0; k < 20; k++) { particles.push({ x: pos.x, y: pos.y, vx: seededRandom(-8, 8), vy: seededRandom(-8, 8), life: 1.0, decay: seededRandom(0.03, 0.08), color: [0, 255, 100], size: seededRandom(5, 12), shape: 'rect', behavior: 'normal' }); } }
   else if (id === 'QUANTUM') { triggerFlash(0, 255, 255, 180); triggerScreenShake(12); }
   else if (id === 'LABYRINTH') { triggerScreenShake(25); triggerFlash(100, 20, 20, 180); activeFX.push({ id: 'LABYRINTH', t: 0, maxT: 50 }); }
   else if (id === 'REWIND') { triggerFlash(255, 215, 0, 150); triggerScreenShake(10); activeFX.push({ id: 'REWIND', t: 0, maxT: 50 }); }
   else if (id === 'GUILLOTINE') { triggerScreenShake(20); activeFX.push({ id: 'GUILLOTINE', t: 0, maxT: 30 }); }
-  else if (id === 'QUAKE') { triggerScreenShake(35); triggerFlash(150, 130, 100, 100); for (let k = 0; k < 60; k++) { particles.push({ x: random(200, 800), y: random(100, 600), vx: random(-2, 2), vy: random(-1, -5), life: 1.0, decay: random(0.01, 0.03), color: [150, 140, 120], size: random(10, 30), shape: 'circle', behavior: 'float' }); } }
+  else if (id === 'QUAKE') { triggerScreenShake(35); triggerFlash(150, 130, 100, 100); for (let k = 0; k < 60; k++) { particles.push({ x: seededRandom(200, 800), y: seededRandom(100, 600), vx: seededRandom(-2, 2), vy: seededRandom(-1, -5), life: 1.0, decay: seededRandom(0.01, 0.03), color: [150, 140, 120], size: seededRandom(10, 30), shape: 'circle', behavior: 'float' }); } }
   else if (id === 'MINDBEND') { 
     triggerScreenShake(20); triggerFlash(200, 50, 255, 150); 
     activeFX.push({ id: 'MINDBEND', t: 0, maxT: 60 }); 
@@ -418,7 +428,7 @@ window.triggerPowerAnimation = function(id, i, j) {
   }
   else if (id === 'TELEPORT') { triggerScreenShake(12); triggerFlash(0, 255, 255, 100); activeFX.push({ id: 'TELEPORT', x: pos.x, y: pos.y, t: 0, maxT: 30 }); }
   else if (id === 'DOUBLE') { triggerFlash(255, 255, 100, 100); activeFX.push({ id: 'DOUBLE', t: 0, maxT: 30 }); }
-  else if (id === 'BLACKOUT') { triggerFlash(0, 0, 0, 255); triggerScreenShake(5); for (let k = 0; k < 50; k++) { particles.push({ x: random(width), y: random(height), vx: random(-3, 3), vy: random(-3, 3), life: 1.0, decay: random(0.01, 0.02), color: [20, 20, 25], size: random(40, 100), shape: 'circle', behavior: 'float' }); } }
+  else if (id === 'BLACKOUT') { triggerFlash(0, 0, 0, 255); triggerScreenShake(5); for (let k = 0; k < 50; k++) { particles.push({ x: seededRandom(width), y: seededRandom(height), vx: seededRandom(-3, 3), vy: seededRandom(-3, 3), life: 1.0, decay: seededRandom(0.01, 0.02), color: [20, 20, 25], size: seededRandom(40, 100), shape: 'circle', behavior: 'float' }); } }
   else if (id === 'MAGNET') { triggerScreenShake(25); activeFX.push({ id: 'MAGNET', t: 0, maxT: 30 }); }
   else if (id === 'ECLIPSE') { triggerFlash(0, 0, 0, 200); activeFX.push({ id: 'ECLIPSE', t: 0, maxT: 50 }); }
   else if (id === 'BULLDOZER') { triggerScreenShake(15); activeFX.push({ id: 'BULLDOZER', row: j, t: 0, maxT: 30 }); }
